@@ -1,0 +1,81 @@
+{
+  "interval_minutes": 1440,
+  "max_candidates_per_cycle": 400,
+  "max_jobs_per_cycle": 80,
+  "linkedin_pages": 3,
+  "linkedin_results_per_page": 10,
+  "linkedin_time_filter": "r604800",
+  "match_threshold": 72,
+  "pay_boost_min_score": 62,
+  "high_pay_hourly": 25,
+  "earliest_allowed_start": "Summer 2026",
+  "posted_after": "2026-05-15",
+  "posted_after_inclusive": false,
+  "posted_date_required": true,
+  "sources": {
+    "linkedin": true,
+    "handshake": true,
+    "serpapi": true
+  },
+  "keywords": [
+    "robotics internship",
+    "robotics co-op",
+    "robotics coop",
+    "robotics co op",
+    "embedded systems internship",
+    "embedded systems co-op",
+    "embedded systems coop",
+    "embedded systems co op",
+    "computer vision internship",
+    "computer vision co-op",
+    "computer vision coop",
+    "computer vision co op",
+    "autonomous systems internship",
+    "autonomous systems co-op",
+    "autonomous systems coop",
+    "autonomous systems co op",
+    "ROS2 internship",
+    "machine learning robotics internship",
+    "software engineer internship robotics",
+    "software engineer co-op robotics",
+    "software engineer coop robotics",
+    "software engineer co op robotics"
+  ],
+  "serpapi_queries": [
+    "(\"Robotics\" OR \"Embedded\" OR \"Computer Vision\" OR \"Autonomous Systems\") (Internship OR \"Co-op\" OR \"Co op\" OR Coop) posted after May 15 2026"
+  ],
+  "disqualifiers": [
+    "us citizenship",
+    "u.s. citizenship",
+    "green card",
+    "security clearance",
+    "clearance required",
+    "no international students",
+    "no cpt/opt",
+    "will not sponsor",
+    "visa sponsorship is not available",
+    "sponsorship is not available",
+    "undergrads only",
+    "bachelor's students only",
+    "bachelors only",
+    "fall 2025",
+    "winter 2025",
+    "spring 2026",
+    "sep 2025",
+    "september 2025"
+  ],
+  "retry": {
+    "attempts": 3,
+    "base_delay_seconds": 4,
+    "max_delay_seconds": 45
+  },
+  "rate_limits": {
+    "between_keywords_seconds": [5, 12],
+    "between_jobs_seconds": [3, 8]
+  },
+  "notifications": {
+    "discord": true,
+    "generate_tailored_resume": true,
+    "generate_cover_letter": true
+  }
+}

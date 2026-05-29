@@ -1,0 +1,17 @@
+.env
+*.env
+auth_state.json
+workday_auth_state.json
+seen_jobs.json
+workday_meta.json
+state/
+logs/
+reports/
+cover_letters/
+tailored_resumes/
+__pycache__/
+*.pyc
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+
