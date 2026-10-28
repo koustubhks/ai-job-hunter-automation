@@ -22,17 +22,17 @@ The original `job_hunter.py`, `workday_jobs.py`, and existing state files were l
 
 ## Current Search Rule
 
-The robust runner is now configured to search internships and co-ops, then keep only jobs posted after `2026-05-15`.
+The robust runner is now configured to search internships and co-ops, then keep only jobs posted on or after `2026-10-01`.
 
 In `job_hunter_robust_config.example.json`:
 
 ```json
-"posted_after": "2026-05-15",
-"posted_after_inclusive": false,
+"posted_after": "2026-10-01",
+"posted_after_inclusive": true,
 "posted_date_required": true
 ```
 
-With this default, May 16, 2026 and later are accepted. Jobs with no detectable posted date are rejected so old postings do not slip through.
+With this default, October 1, 2026 and later are accepted. Jobs with no detectable posted date are rejected so old postings do not slip through.
 
 ## Recommended Run Commands
 
@@ -140,7 +140,7 @@ The new runner still assists with discovery, scoring, alerts, and document draft
 ## Additional Changes I Recommend Next
 
 - Move `RESUME_TEXT` out of Python into `resume_master.md` so you can update it without editing code.
-- Replace the Gemini package mismatch in the current project: the code imports `google.genai`, but `requirements.txt` lists `google-generativeai`. Align it to the package you actually use.
+- Keep the Gemini import and package aligned. Both currently use `google-genai`.
 - Add a small dashboard or CSV export for jobs in SQLite so you can review `notified`, `rejected`, and `notify_failed` jobs.
 - Add source-specific rate limits, especially for LinkedIn and Handshake.
 - Add unit tests for pay parsing, disqualifier detection, AI response parsing, and deduplication.

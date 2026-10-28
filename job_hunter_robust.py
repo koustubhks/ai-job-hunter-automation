@@ -16,6 +16,7 @@ It does not auto-apply to jobs. It finds, scores, prepares documents, and alerts
 from __future__ import annotations
 
 import argparse
+import csv
 import json
 import logging
 import os
@@ -189,6 +190,9 @@ class StateStore:
             """
         )
         self._ensure_column("jobs", "posted_date", "TEXT")
+        self._ensure_column("jobs", "documents_status", "TEXT NOT NULL DEFAULT 'unknown'")
+        self._ensure_column("jobs", "documents_error", "TEXT")
+        self._ensure_column("jobs", "documents_generated_at", "TEXT")
         self.conn.commit()
 
     def _ensure_column(self, table: str, column: str, definition: str) -> None:
@@ -336,6 +340,21 @@ class StateStore:
         )
         self.conn.commit()
 
+    def mark_documents(self, uid: str, success: bool, error: str = "") -> None:
+        self.conn.execute(
+            """UPDATE jobs SET documents_status = ?, documents_error = ?,
+                      documents_generated_at = ? WHERE uid = ?""",
+            ("generated" if success else "failed", None if success else safe_text(error, 3000),
+             now_iso() if success else None, uid),
+        )
+        self.conn.commit()
+
+    def failed_documents(self, limit: int = 20) -> List[sqlite3.Row]:
+        return self.conn.execute(
+            """SELECT * FROM jobs WHERE status = 'notified' AND documents_status = 'failed'
+               ORDER BY notified_at DESC LIMIT ?""", (limit,)
+        ).fetchall()
+
     def reset_failed_alerts(self) -> int:
         cur = self.conn.execute(
             "UPDATE jobs SET status = 'scored', last_error = NULL WHERE status = 'notify_failed'"
@@ -360,6 +379,63 @@ def job_to_dict(job: legacy.Job) -> Dict[str, Any]:
 def normalize_piece(value: str) -> str:
     value = re.sub(r"\s+", " ", (value or "").lower()).strip()
     return re.sub(r"[^a-z0-9+.# /-]", "", value)
+
+
+def config_terms(config: Dict[str, Any], key: str) -> List[str]:
+    values = config.get(key, [])
+    if not isinstance(values, list):
+        return []
+    return [str(value).strip() for value in values if str(value).strip()]
+
+
+def text_has_any_term(text: str, terms: Iterable[str]) -> bool:
+    normalized = normalize_piece(text)
+    return any(normalize_piece(term) in normalized for term in terms)
+
+
+def text_has_company_term(text: str, term: str) -> bool:
+    normalized = normalize_piece(text)
+    normalized_term = normalize_piece(term)
+    if not normalized_term:
+        return False
+    compact = re.sub(r"[^a-z0-9]", "", normalized_term)
+    if len(compact) <= 3:
+        return re.search(rf"(?<![a-z0-9]){re.escape(normalized_term)}(?![a-z0-9])", normalized) is not None
+    return normalized_term in normalized
+
+
+def job_text(job: legacy.Job, fields: Iterable[str]) -> str:
+    return " ".join(str(getattr(job, field, "") or "") for field in fields)
+
+
+def is_watchlist_company(job: legacy.Job, config: Dict[str, Any]) -> bool:
+    terms = config_terms(config, "company_watchlist")
+    if not terms:
+        return False
+    text = job_text(job, ("company", "title"))
+    return any(text_has_company_term(text, term) for term in terms)
+
+
+def is_student_role(job: legacy.Job, config: Dict[str, Any]) -> bool:
+    terms = config_terms(config, "student_role_terms")
+    if not terms:
+        return True
+    return text_has_any_term(job_text(job, ("title",)), terms)
+
+
+def is_watchlist_relevant_role(job: legacy.Job, config: Dict[str, Any]) -> bool:
+    terms = config_terms(config, "watchlist_title_terms")
+    if not terms:
+        return True
+    return text_has_any_term(job_text(job, ("title", "description")), terms)
+
+
+def is_watchlist_candidate(job: legacy.Job, config: Dict[str, Any]) -> bool:
+    if not is_watchlist_company(job, config):
+        return False
+    if bool(config.get("watchlist_require_student_role", True)) and not is_student_role(job, config):
+        return False
+    return is_watchlist_relevant_role(job, config)
 
 
 def identity_key(job: legacy.Job) -> str:
@@ -438,6 +514,7 @@ def collect_jobs(config: Dict[str, Any], retry: RetryPolicy) -> Tuple[List[legac
                 lambda kw=keyword: legacy.search_linkedin(kw),
                 errors,
             ))
+            random_sleep(config, "between_linkedin_searches_seconds")
 
         if source_enabled(config, "handshake"):
             all_jobs.extend(safe_source_call(
@@ -446,6 +523,7 @@ def collect_jobs(config: Dict[str, Any], retry: RetryPolicy) -> Tuple[List[legac
                 lambda kw=keyword: legacy.search_handshake(kw),
                 errors,
             ))
+            random_sleep(config, "between_handshake_searches_seconds")
 
         random_sleep(config, "between_keywords_seconds")
 
@@ -458,6 +536,7 @@ def collect_jobs(config: Dict[str, Any], retry: RetryPolicy) -> Tuple[List[legac
                 lambda q=query: legacy.search_serpapi(q),
                 errors,
             ))
+            random_sleep(config, "between_serpapi_queries_seconds")
 
     deduped = dedupe_jobs(all_jobs)
     total_deduped = len(deduped)
@@ -505,13 +584,22 @@ def parse_posted_date(value: str, today: Optional[date] = None) -> Optional[date
     if parsed:
         return parsed
 
-    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%b %d, %Y", "%B %d, %Y", "%b %d", "%B %d"):
+    for fmt in ("%Y-%m-%d", "%m/%d/%Y", "%b %d, %Y", "%B %d, %Y"):
         try:
             dt = datetime.strptime(raw, fmt)
-            year = dt.year if "%Y" in fmt else today.year
-            candidate = date(year, dt.month, dt.day)
+            candidate = dt.date()
             if candidate > today + timedelta(days=30):
-                candidate = date(year - 1, dt.month, dt.day)
+                candidate = date(candidate.year - 1, candidate.month, candidate.day)
+            return candidate
+        except ValueError:
+            continue
+
+    for fmt in ("%b %d %Y", "%B %d %Y"):
+        try:
+            dt = datetime.strptime(f"{raw} {today.year}", fmt)
+            candidate = dt.date()
+            if candidate > today + timedelta(days=30):
+                candidate = date(candidate.year - 1, candidate.month, candidate.day)
             return candidate
         except ValueError:
             continue
@@ -555,6 +643,21 @@ def posted_date_filter_reason(job: legacy.Job, config: Dict[str, Any]) -> str:
     inclusive = bool(config.get("posted_after_inclusive", False))
     relation = "on or after" if inclusive else "after"
 
+    if is_watchlist_candidate(job, config):
+        watch_cutoff_raw = str(config.get("watchlist_posted_after", "")).strip()
+        watch_cutoff = parse_iso_date(watch_cutoff_raw) if watch_cutoff_raw else None
+        if watch_cutoff_raw and not watch_cutoff:
+            logging.warning("Invalid watchlist_posted_after config value: %s", watch_cutoff_raw)
+        if not posted and bool(config.get("watchlist_allow_missing_posted_date", False)):
+            return ""
+        if posted and watch_cutoff:
+            if inclusive:
+                if posted < watch_cutoff:
+                    return f"Watchlist target posted {posted.isoformat()}, before watchlist cutoff {watch_cutoff.isoformat()}"
+            elif posted <= watch_cutoff:
+                return f"Watchlist target posted {posted.isoformat()}, not after watchlist cutoff {watch_cutoff.isoformat()}"
+            return ""
+
     if not posted:
         if required:
             return f"Posted date unavailable; required to be {relation} {cutoff.isoformat()}"
@@ -579,8 +682,20 @@ def parse_term(value: str) -> Optional[Tuple[int, int]]:
 def disqualification_reason(job: legacy.Job, config: Dict[str, Any]) -> str:
     text = normalize_piece(f"{job.title} {job.company} {job.location} {job.pay} {job.description}")
     for term in config.get("disqualifiers", []):
-        if normalize_piece(term) in text:
-            return f"Contains disqualifier: {term}"
+        normalized = normalize_piece(term)
+        if normalized not in text:
+            continue
+        # Some listings explicitly say a credential is not required. Do not
+        # reject those simply because the credential name appears in the text.
+        if normalized in {"us citizenship", "u.s. citizenship", "green card",
+                          "security clearance"}:
+            escaped = re.escape(normalized)
+            negated = (rf"\b(?:no|without)\s+{escaped}\s+(?:is\s+)?required\b",
+                       rf"\b{escaped}\s+(?:is\s+)?not\s+required\b",
+                       rf"\b(?:does\s+not|do\s+not)\s+require\s+{escaped}\b")
+            if any(re.search(pattern, text) for pattern in negated):
+                continue
+        return f"Contains disqualifier: {term}"
 
     earliest = parse_term(str(config.get("earliest_allowed_start", "")))
     if earliest:
@@ -591,7 +706,13 @@ def disqualification_reason(job: legacy.Job, config: Dict[str, Any]) -> str:
     return ""
 
 
-def should_notify(score: int, pay_text: str, config: Dict[str, Any]) -> Tuple[bool, str]:
+def should_notify(job: legacy.Job, score: int, pay_text: str, config: Dict[str, Any]) -> Tuple[bool, str]:
+    if is_watchlist_candidate(job, config):
+        watch_score = int(config.get("watchlist_notify_min_score", 62))
+        if score >= watch_score:
+            company = str(getattr(job, "company", "") or "target company").strip()
+            return True, f">={watch_score}% watchlist target ({company})"
+
     match_threshold = int(config.get("match_threshold", 72))
     if score >= match_threshold:
         return True, f">={match_threshold}% match"
@@ -658,9 +779,11 @@ def generate_documents(job: legacy.Job, score: int, clients: Dict[str, Any],
                        config: Dict[str, Any]) -> None:
     notifications = config.get("notifications", {})
     if notifications.get("generate_tailored_resume", True):
-        legacy.generate_tailored_resume(job, score, clients)
+        if not legacy.generate_tailored_resume(job, score, clients):
+            raise RuntimeError("Tailored resume generation did not produce a file")
     if notifications.get("generate_cover_letter", True):
-        legacy.generate_cover_letter_docx(job, score, clients)
+        if not legacy.generate_cover_letter_docx(job, score, clients):
+            raise RuntimeError("Cover letter generation did not produce a file")
 
 
 def write_report(summary: Dict[str, Any]) -> None:
@@ -684,6 +807,7 @@ def write_report(summary: Dict[str, Any]) -> None:
         f"- Processable: {summary.get('processable', 0)}",
         f"- Notified: {summary.get('notified', 0)}",
         f"- Would notify: {summary.get('would_notify', 0)}",
+        f"- Documents retried successfully: {summary.get('documents_retried', 0)}",
         f"- Date filtered: {summary.get('date_filtered', 0)}",
         f"- Rejected/disqualified: {summary.get('rejected', 0)}",
         f"- Errors: {summary.get('errors', 0)}",
@@ -703,6 +827,49 @@ def write_report(summary: Dict[str, Any]) -> None:
     tmp_md = md_path.with_suffix(".md.tmp")
     tmp_md.write_text("\n".join(lines) + "\n", encoding="utf-8")
     tmp_md.replace(md_path)
+
+
+def export_jobs_csv(state: StateStore) -> Path:
+    """Export reviewable job history without changing its processing state."""
+    REPORT_DIR.mkdir(exist_ok=True)
+    output = REPORT_DIR / "jobs.csv"
+    temporary = REPORT_DIR / "jobs.csv.tmp"
+    fields = ("title", "company", "source", "url", "posted_date", "status",
+              "score", "reason", "trigger", "first_seen", "last_seen",
+              "notified_at", "last_error")
+    with temporary.open("w", newline="", encoding="utf-8-sig") as stream:
+        writer = csv.writer(stream)
+        writer.writerow(fields)
+        rows = state.conn.execute(
+            "SELECT " + ", ".join(fields) + " FROM jobs ORDER BY last_seen DESC"
+        )
+        for row in rows:
+            writer.writerow([row[field] for field in fields])
+    temporary.replace(output)
+    return output
+
+
+def send_cycle_digest(summary: Dict[str, Any], webhook_url: str) -> None:
+    digest_day = str(summary["finished_at"])[:10]
+    marker = REPORT_DIR / "digest_state.json"
+    previous = load_json(marker) if marker.exists() else {}
+    if previous.get("sent_for_day") == digest_day:
+        return
+    source_errors = summary.get("source_errors", [])
+    lines = [
+        "Job Hunter cycle summary",
+        f"Status: {summary['status']}",
+        f"Found: {summary['total_found']} | Processed: {summary['processable']} | "
+        f"Alerted: {summary['notified']} | Rejected: {summary['rejected']}",
+        f"Errors: {summary['errors']} | Source errors: {len(source_errors)}",
+        f"Document retries completed: {summary['documents_retried']}",
+    ]
+    if source_errors:
+        lines.append("Sources needing attention: " + "; ".join(source_errors)[:900])
+    post_discord({"content": "\n".join(lines)}, webhook_url)
+    temporary = marker.with_suffix(".tmp")
+    temporary.write_text(json.dumps({"sent_for_day": digest_day}), encoding="utf-8")
+    temporary.replace(marker)
 
 
 def row_is_processable(row: sqlite3.Row) -> bool:
@@ -726,6 +893,7 @@ def run_cycle(config: Dict[str, Any], state: Optional[StateStore],
         "processable": 0,
         "notified": 0,
         "would_notify": 0,
+        "documents_retried": 0,
         "date_filtered": 0,
         "rejected": 0,
         "errors": 0,
@@ -734,6 +902,19 @@ def run_cycle(config: Dict[str, Any], state: Optional[StateStore],
     }
 
     try:
+        if state and not dry_run:
+            for row in state.failed_documents():
+                try:
+                    payload = json.loads(row["payload_json"] or "{}")
+                    job_for_docs = legacy.Job(**payload)
+                    generate_documents(job_for_docs, int(row["score"] or 0), clients, config)
+                    state.mark_documents(str(row["uid"]), True)
+                    summary["documents_retried"] += 1
+                except Exception as exc:
+                    state.mark_documents(str(row["uid"]), False, str(exc))
+                    summary["errors"] += 1
+                    logging.error("Document retry failed for %s: %s", row["uid"], exc)
+
         jobs, source_errors = collect_jobs(config, retry)
         summary["source_errors"] = source_errors
         summary["errors"] += len(source_errors)
@@ -810,7 +991,7 @@ def run_cycle(config: Dict[str, Any], state: Optional[StateStore],
                     f"score[{canonical_uid}]",
                     lambda j=job: legacy.ai_score(j, clients),
                 )
-                send_flag, trigger = should_notify(score, job.pay, config)
+                send_flag, trigger = should_notify(job, score, job.pay, config)
                 job_item.update({"score": score, "trigger": trigger})
 
                 if not send_flag:
@@ -839,7 +1020,11 @@ def run_cycle(config: Dict[str, Any], state: Optional[StateStore],
                     logging.info("Alert sent for %s%% match: %s", score, job.title)
                     try:
                         generate_documents(job, score, clients, config)
+                        if state:
+                            state.mark_documents(canonical_uid, True)
                     except Exception as doc_exc:
+                        if state:
+                            state.mark_documents(canonical_uid, False, str(doc_exc))
                         summary["errors"] += 1
                         job_item["doc_error"] = str(doc_exc)
                         logging.error("Document generation failed after alert was sent: %s", doc_exc)
@@ -911,6 +1096,7 @@ def main() -> None:
     parser.add_argument("--dry-run", action="store_true",
                         help="Score and report without sending alerts, writing DB state, or generating docs")
     parser.add_argument("--health-check", action="store_true", help="Check local setup and exit")
+    parser.add_argument("--export-csv", action="store_true", help="Export SQLite jobs to reports/jobs.csv and exit")
     parser.add_argument("--setup-auth", action="store_true",
                         help="Delegate to the existing Handshake auth setup flow")
     parser.add_argument("--reset-failed-alerts", action="store_true",
@@ -932,6 +1118,14 @@ def main() -> None:
     if args.health_check:
         raise SystemExit(health_check(config))
 
+    if args.export_csv:
+        state = StateStore(DB_PATH)
+        try:
+            logging.info("Exported jobs to %s", export_jobs_csv(state))
+        finally:
+            state.close()
+        return
+
     state = None if args.dry_run else StateStore(DB_PATH)
     try:
         if args.reset_failed_alerts and state:
@@ -943,6 +1137,18 @@ def main() -> None:
         while True:
             logging.info("Starting cycle %s", cycle)
             summary = run_cycle(config, state, clients, dry_run=args.dry_run)
+            if state and not args.dry_run:
+                try:
+                    export_jobs_csv(state)
+                except Exception as exc:
+                    logging.error("CSV export failed: %s", exc)
+                digest_hour = int(config.get("notifications", {}).get("daily_digest_after_hour_local", 20))
+                if (config.get("notifications", {}).get("daily_digest", True)
+                        and datetime.fromisoformat(summary["finished_at"]).hour >= digest_hour):
+                    try:
+                        send_cycle_digest(summary, os.getenv("DISCORD_WEBHOOK", "").strip())
+                    except Exception as exc:
+                        logging.error("Cycle digest failed: %s", exc)
             logging.info(
                 "Cycle complete: status=%s found=%s processable=%s notified=%s would_notify=%s rejected=%s errors=%s",
                 summary["status"],

@@ -90,51 +90,77 @@ except ImportError:
 # ── Resume text (Koustubh Sadalagi) ──────────────────────────────────────────
 RESUME_TEXT = """
 KOUSTUBH KRISHNA SADALAGI
-[phone redacted for public repo] | [email redacted] | [LinkedIn profile]
++1 480-374-9476 | sadalagi.koustubh@gmail.com | linkedin.com/in/koustubh-sadalagi-b544a0257 | github.com/koustubhks
+
+SUMMARY
+MS Robotics & Autonomous Systems student at Arizona State University focused on robotics software,
+computer vision, embedded systems, robot manipulation, robot learning, and autonomous systems.
+Hands-on experience with Python, C/C++, OpenCV, ROS 2, embedded microcontrollers, CAN/LIN/Ethernet,
+perception-to-control pipelines, teleoperation, path planning, motion planning, real-time inference,
+and AI-assisted robotics projects. Seeking robotics software, computer vision, embedded systems,
+autonomous systems, robot learning, or AI/ML engineering internships, co-ops, and full-time roles.
 
 EDUCATION
-- MS Robotics & Autonomous Systems – Systems Engineering, Arizona State University (Aug 2025–May 2027), GPA 3.33/4.0
-  Coursework: Advanced Robotics, Embedded Systems, AI & Machine Learning, Control Systems
-- B.E. Information Science & Engineering, Jyothy Institute of Technology, India (2020–2024), GPA 7.35/10
+- MS Robotics & Autonomous Systems - Systems Engineering, Arizona State University, Tempe, AZ
+  Aug 2025 - May 2027 | GPA 3.61/4.0
+  Coursework: Advanced Robotics, Embedded Systems, Artificial Intelligence, Machine Learning, Control Systems
+- B.E. Information Science & Engineering, Jyothy Institute of Technology, Bengaluru, India
+  2020 - 2024 | GPA 7.35/10
 
 TECHNICAL SKILLS
-Programming:              C, C++ (intermediate), Python, Java
-Machine Learning & CV:    TensorFlow, OpenCV, Gemini API, GPT-4
-Embedded & Real-Time:     Embedded C/C++, Infineon AURIX TC397, CAN, LIN, Ethernet, Microcontrollers
-Control & Modeling:       MATLAB, Simulink, Control System Analysis, PWM Control
-Robotics:                 ROS2, Real-Time Systems, Control Systems
-Web & Automation:         HTML, CSS, JavaScript, Microsoft Power Platform, SharePoint
-OS:                       Linux, Windows
+Programming: Python, C, C++, Java, MATLAB, Git, GitHub
+Robotics, AI & Computer Vision: ROS 2, OpenCV, PyTorch, TensorFlow, Transformers, Hugging Face,
+LoRA, imitation learning, ACT, CARLA, perception, planning, controls
+Embedded & Real-Time Systems: Embedded C/C++, Infineon AURIX TC397, GPIO, MCMCAN, CAN, LIN,
+Ethernet, Trace, miniWiggler
+Automation & Tools: Linux, Windows, Simulink, Microsoft Power Platform, SharePoint, Playwright,
+Discord webhooks, APIs
 
 PROFESSIONAL EXPERIENCE
-Oregano Solutions — Mumbai | RPA Developer | Oct 2024 – Jul 2025
-  - Designed workflow automation with Microsoft Power Platform, reducing manual processing time
-  - Tested/refined automation logic across multiple business processes
-
-Nexteer Automotive — Bangalore | Embedded SW Intern | Nov–Dec 2023
-  - Real-time embedded software on Infineon AURIX TC397 for automotive ECU
-  - GPIO & MCMCAN modules with CAN, LIN, Ethernet protocols
-  - System debugging/validation with Trace and miniWiggler tools
-  - Safety-conscious embedded environment; cross-functional collaboration
+- IT Office Aide, Arizona State University, Tempe, AZ | May 2026 - Present
+  Provide technical support for students, faculty, and staff; troubleshoot hardware, software,
+  account, and classroom technology issues.
+- RPA Engineer, Oregano Solutions, Mumbai, India | Oct 2024 - Jul 2025
+  Designed and deployed workflow automation using Microsoft Power Platform, reducing manual processing
+  time and improving business-process reliability. Tested automation logic across multiple workflows
+  and supported end users with troubleshooting, reporting, and process documentation.
+- Embedded Software Development Intern, Nexteer Automotive, Bengaluru, India | Nov 2023 - Dec 2023
+  Developed and debugged embedded software for Infineon AURIX TC397XX microcontrollers using AURIX
+  Development Studio, GPIO, and MCMCAN. Worked with CAN, LIN, and Ethernet communication concepts
+  while validating automotive ECU behavior with Trace and miniWiggler debugging tools. Documented
+  issues, analyzed failures, and collaborated with engineering mentors in a safety-critical automotive
+  software environment.
 
 PROJECTS
-- Transformer-Based Imitation Learning (ACT) for Robotic Manipulation [ongoing]:
-  Dual-arm leader-follower robot, CVAE transformer architecture, dual-camera perception-to-action pipeline,
-  training pipeline, cloth-folding task evaluation.
-- Autonomous Driving with CARLA Simulator [ongoing]:
-  Perception-to-control, lane following, obstacle avoidance, checkpoint training pipeline.
-- Parameter-Efficient Fine-Tuning with LoRA [ongoing]:
-  LoRA fine-tuning on transformer models, memory benchmarking vs full fine-tuning.
-- LLM-Controlled Agentic Robot for Pick-and-Place [Dec 2025]:
-  OpenCV + LLM pipeline, affine transforms, Dobot robotic arm, real-world deployment.
-- Autonomous Maze Solving Robot Agent [Nov 2025]:
-  BFS path planning, homography warping, OpenCV, colored-marker detection, Dobot execution.
-- Brain Tumor Detection CNN + Gemini Pro [May 2024]:
-  EfficientNetB1 MRI classifier with TensorFlow; integrated Gemini Pro Vision for diagnostics.
+- Transformer-Based Imitation Learning for SO-101 Robot Manipulation:
+  LeRobot, ACT, PyTorch, OpenCV. Built a dual-arm leader-follower data-collection setup using SO-101
+  arms and camera inputs for manipulation tasks such as clutter sorting, pick-and-place, and cloth
+  handling. Designed a perception-to-action pipeline with teleoperation, synchronized robot trajectories,
+  visual observations, curated demonstrations, and transformer/CVAE action-sequence prediction.
+- TCP-GRU Autonomous Driving Pipeline:
+  CARLA, Python, PyTorch, Computer Vision. Developed an autonomous-driving research pipeline in CARLA
+  for perception-to-control policy training, checkpoint evaluation, route following, motion planning,
+  and scenario testing. Used temporal modeling concepts with GRU-based sequence learning to improve
+  decision consistency across sequential driving observations.
+- LLM-Controlled Agentic Robot for Pick-and-Place:
+  Python, OpenCV, LLM Planner, Dobot. Built an agentic robot system connecting natural-language
+  instructions to visual perception, task planning, and physical robot execution. Implemented OpenCV
+  scene detection and affine coordinate transformation to map camera observations into robot-frame
+  pick-and-place actions.
+- Vision-Guided Maze-Solving Robot Agent:
+  Python, OpenCV, BFS, Homography. Created a computer-vision robotics pipeline for maze detection,
+  colored-marker recognition, homography-based grid mapping, BFS path planning, and Dobot motion execution.
+- LoRA Adapter Merge and Parameter-Efficient Fine-Tuning:
+  PyTorch, Transformers, Hugging Face. Experimented with LoRA adapter merging, task arithmetic,
+  rank ablation, and model evaluation to study efficient adaptation of transformer models.
+- AI Job Hunter Automation:
+  Python, Playwright, LLM APIs, Discord. Built a robust job-search automation system that collects
+  postings from LinkedIn, Handshake, and SerpApi; filters relevant opportunities; scores role fit with
+  LLMs; tracks state; and sends Discord alerts.
 
 RESEARCH INTERESTS
-Wearable robotics, exoskeletons, soft robotics, human-robot interaction, AI for healthcare,
-embodied intelligence
+Robot learning, embodied AI, autonomous systems, machine vision, embedded robotics, sensor fusion,
+human-robot interaction
 """.strip()
 
 # ── Config ────────────────────────────────────────────────────────────────────
@@ -909,7 +935,8 @@ def _parse_ai_response(raw: str, fallback_job: Job) -> Tuple[int, str]:
             return score, detail
     except Exception:
         pass
-    return keyword_score(fallback_job)
+    score, reason = keyword_score(fallback_job)
+    return score, f"Fallback keyword score (invalid AI response): {reason}"
 
 
 def _score_prompt(job: Job) -> str:
@@ -975,7 +1002,7 @@ Description:
 Output the full tailored resume text only — no commentary, no markdown headers."""
 
 
-def generate_tailored_resume(job: Job, score: int, clients: dict) -> None:
+def generate_tailored_resume(job: Job, score: int, clients: dict) -> Optional[Path]:
     """Generate a tailored resume for a matched job and save to tailored_resumes/."""
     TAILORED_RESUMES_DIR.mkdir(exist_ok=True)
 
@@ -1013,6 +1040,7 @@ def generate_tailored_resume(job: Job, score: int, clients: dict) -> None:
     filename = TAILORED_RESUMES_DIR / f"{safe}_{score}pct_{datetime.now().strftime('%Y%m%d')}.txt"
     filename.write_text(resume_text, encoding="utf-8")
     print(f"    [Resume] Saved tailored resume → {filename}")
+    return filename
 
 
 COVER_LETTERS_DIR = Path("cover_letters")
@@ -1040,7 +1068,7 @@ Description:
 
 Output the professional cover letter text only."""
 
-def generate_cover_letter_docx(job: Job, score: int, clients: dict) -> None:
+def generate_cover_letter_docx(job: Job, score: int, clients: dict) -> Optional[Path]:
     """Generate a cover letter for a matched job and save to cover_letters/ as .docx."""
     if not HAS_DOCX:
         return
@@ -1086,6 +1114,7 @@ def generate_cover_letter_docx(job: Job, score: int, clients: dict) -> None:
         filename = COVER_LETTERS_DIR / f"{safe}_{score}pct_{datetime.now().strftime('%Y%m%d')}.docx"
         doc.save(filename)
         print(f"    [CoverLetter] Saved tailored cover letter → {filename}")
+        return filename
     except Exception as exc:
         print(f"    [CoverLetter] Failed to save docx: {exc}")
 
@@ -1154,7 +1183,8 @@ def ai_score(job: Job, clients: dict) -> Tuple[int, str]:
     if clients.get("openai"):
         res = openai_score(job, clients["openai"])
         if res: return res
-    return keyword_score(job)
+    score, reason = keyword_score(job)
+    return score, f"Fallback keyword score (AI unavailable): {reason}"
 
 
 def should_notify(score: int, pay_text: str) -> Tuple[bool, str]:
@@ -1251,7 +1281,7 @@ def run_cycle(discord_webhook: str, clients: dict) -> None:
         time.sleep(random.uniform(3, 7))
 
     print(f"\n  Keyword: \"SerpApi FAANG/Indeed Mega-Query\"")
-    mega_query = '("Robotics" OR "Embedded" OR "Computer Vision" OR "Autonomous Systems") (Internship OR "Co-op" OR Coop) posted after May 15 2026'
+    mega_query = '("Robotics" OR "Embedded" OR "Computer Vision" OR "Autonomous Systems") (Internship OR "Co-op" OR Coop) posted after October 1 2026'
     all_jobs += search_serpapi(mega_query)
 
     all_jobs = dedup(all_jobs)
