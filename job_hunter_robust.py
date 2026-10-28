@@ -1161,6 +1161,8 @@ def main() -> None:
             )
 
             if args.once:
+                if summary["status"] != "completed":
+                    raise SystemExit(1)
                 break
 
             wait_sec = max(60, int(config.get("interval_minutes", 1440)) * 60)

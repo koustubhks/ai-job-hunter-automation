@@ -1,0 +1,56 @@
+name: Job Hunter
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 08:15 and 20:15 in Phoenix (UTC-7 year round).
+    - cron: "15 3,15 * * *"
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: job-hunter-production
+  cancel-in-progress: false
+
+jobs:
+  search:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      TZ: America/Phoenix
+      GITHUB_TOKEN: ${{ github.token }}
+      STATE_KEY: ${{ secrets.JOB_HUNTER_STATE_KEY }}
+      DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      SERPAPI_KEYS: ${{ secrets.SERPAPI_KEYS }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Validate required secrets
+        run: python cloud_state.py validate-env
+      - name: Restore encrypted job history
+        id: restore
+        run: python cloud_state.py restore
+      - name: Search and alert
+        id: hunt
+        run: python job_hunter_robust.py --config job_hunter_cloud_config.json --once
+      - name: Encrypt updated job history
+        id: save
+        if: always() && steps.restore.outcome == 'success'
+        run: python cloud_state.py save
+      - name: Keep encrypted job history for the next run
+        if: always() && steps.save.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: job-hunter-state
+          path: state.enc
+          if-no-files-found: error
+          retention-days: 90

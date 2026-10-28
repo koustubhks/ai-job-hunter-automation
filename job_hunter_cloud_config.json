@@ -1,0 +1,9 @@
+{
+  "sources": {
+    "handshake": false
+  },
+  "notifications": {
+    "generate_tailored_resume": false,
+    "generate_cover_letter": false
+  }
+}

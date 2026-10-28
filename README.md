@@ -49,9 +49,37 @@ run the local copy at 8 AM and 8 PM. The night cycle sends one Discord digest pe
 day; `monitor_job_hunter.py` can be scheduled separately to alert when no cycle
 has completed within 30 hours. `--export-csv` writes `reports/jobs.csv` for review.
 
-This repository currently has no GitHub Actions schedule. A cloud schedule needs
-durable state and a safe way to refresh authenticated sources before enabling it;
-otherwise repeated runs can duplicate alerts or lose access to Handshake.
+## GitHub Actions schedule
+
+`.github/workflows/job-hunter.yml` searches at 8:15 AM and 8:15 PM Phoenix time
+after it is merged into the default branch and the repository secrets are set.
+The off-hour minute reduces scheduler congestion. GitHub schedules are best effort,
+not an exact-time guarantee.
+
+Set these repository Actions secrets before the first run:
+
+- `JOB_HUNTER_STATE_KEY`: a Fernet encryption key for the saved SQLite history
+- `DISCORD_WEBHOOK`: your alert webhook
+- `SERPAPI_KEYS`: your SerpApi key or comma-separated keys
+- `GEMINI_API_KEY` or `OPENAI_API_KEY`: at least one AI scorer
+
+The first run restores `cloud_state_seed.enc`, which is an encrypted snapshot of
+the existing local job history. Later runs restore the latest encrypted Actions
+artifact and upload an updated copy. If history is missing after a previous run,
+the workflow stops instead of starting fresh and duplicating alerts. Do not
+commit the encryption key or plaintext database. An interrupted run after sending
+an alert but before uploading its artifact can still cause a duplicate; review
+failed runs before restarting them.
+
+The cloud configuration disables Handshake because its browser login state is
+local and expires. It also disables generated resume and cover-letter files,
+which would otherwise disappear with the temporary runner. Cloud runs still
+search LinkedIn and SerpApi, score matches, and send Discord alerts. Keep the
+local scheduled tasks disabled once cloud runs are verified, or both systems may
+send the same alerts from separate databases.
+
+For public repositories, GitHub may disable scheduled workflows after 60 days
+without repository activity. Check the Actions page periodically.
 
 Important settings:
 
