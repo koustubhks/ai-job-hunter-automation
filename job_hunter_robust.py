@@ -771,7 +771,17 @@ def post_discord(payload: Dict[str, Any], webhook_url: str) -> None:
         raise RuntimeError("DISCORD_WEBHOOK is not configured")
     if not getattr(legacy, "HAS_REQUESTS", False):
         raise RuntimeError("requests is not installed")
+    for embed in payload.get("embeds", []):
+        embed["title"] = safe_text(embed.get("title") or "Job alert", 256)
+        embed["description"] = safe_text(embed.get("description") or "No description", 4096)
+        if embed.get("url") and not str(embed["url"]).startswith(("http://", "https://")):
+            embed.pop("url", None)
+        for field in embed.get("fields", []):
+            field["name"] = safe_text(field.get("name") or "Info", 256)
+            field["value"] = safe_text(field.get("value") or "Not provided", 1024)
     response = legacy.requests.post(webhook_url, json=payload, timeout=15)
+    if response.status_code == 400:
+        logging.error("Discord rejected alert payload: %s", safe_text(response.text, 500))
     response.raise_for_status()
 
 
@@ -1011,6 +1021,8 @@ def run_cycle(config: Dict[str, Any], state: Optional[StateStore],
                 else:
                     if not discord_enabled:
                         raise RuntimeError("Discord notifications are disabled in config")
+                    if state:
+                        state.mark_scored(canonical_uid, score, reason, "scored", trigger)
                     payload = legacy.format_discord_message(job, score, reason, trigger)
                     retry.call(f"discord[{canonical_uid}]", lambda: post_discord(payload, webhook))
                     if state:
@@ -1088,6 +1100,48 @@ def health_check(config: Dict[str, Any]) -> int:
     return 0
 
 
+def retry_failed_notifications(config: Dict[str, Any], state: StateStore,
+                               clients: Dict[str, Any]) -> int:
+    """Retry failed alerts without repeating all source searches."""
+    rows = state.conn.execute(
+        "SELECT * FROM jobs WHERE status = 'notify_failed' ORDER BY last_seen DESC"
+    ).fetchall()
+    retry = RetryPolicy.from_config(config)
+    webhook = os.getenv("DISCORD_WEBHOOK", "").strip()
+    failures = 0
+    for row in rows:
+        uid = str(row["uid"])
+        try:
+            job = legacy.Job(**json.loads(row["payload_json"] or "{}"))
+            job = fetch_details_if_needed(job, retry)
+            if row["score"] is None:
+                score, reason = retry.call(f"score[{uid}]", lambda: legacy.ai_score(job, clients))
+            else:
+                score, reason = int(row["score"]), str(row["reason"] or "")
+            should_send, trigger = should_notify(job, score, job.pay, config)
+            if not should_send:
+                state.mark_scored(uid, score, reason, "rejected", "retry below threshold")
+                logging.info("Retry no longer qualifies: %s", uid)
+                continue
+            state.mark_scored(uid, score, reason, "scored", trigger)
+            payload = legacy.format_discord_message(job, score, reason, trigger)
+            retry.call(f"discord[{uid}]", lambda: post_discord(payload, webhook))
+            state.mark_notified(uid, score, reason, trigger)
+            logging.info("Retried alert sent: %s", uid)
+            try:
+                generate_documents(job, score, clients, config)
+                state.mark_documents(uid, True)
+            except Exception as exc:
+                state.mark_documents(uid, False, str(exc))
+                logging.error("Document generation failed after retry alert: %s", exc)
+        except Exception as exc:
+            state.mark_error(uid, "notify_failed", str(exc))
+            failures += 1
+            logging.error("Failed alert retry: %s: %s", uid, exc)
+    logging.info("Retry summary: attempted=%s failed=%s", len(rows), failures)
+    return failures
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Robust Job Hunter automation v2")
     parser.add_argument("--config", type=Path, default=None,
@@ -1101,6 +1155,8 @@ def main() -> None:
                         help="Delegate to the existing Handshake auth setup flow")
     parser.add_argument("--reset-failed-alerts", action="store_true",
                         help="Move notify_failed jobs back to scored so they can be retried")
+    parser.add_argument("--retry-failed-only", action="store_true",
+                        help="Retry failed Discord alerts without running source searches")
     parser.add_argument("--interval-minutes", type=int, default=None,
                         help="Override the configured schedule interval")
     parser.add_argument("--verbose", action="store_true", help="Enable debug logging")
@@ -1133,6 +1189,10 @@ def main() -> None:
             logging.info("Reset %s failed alerts", count)
 
         clients = build_ai_clients()
+        if args.retry_failed_only:
+            failures = retry_failed_notifications(config, state, clients)
+            export_jobs_csv(state)
+            raise SystemExit(1 if failures else 0)
         cycle = 1
         while True:
             logging.info("Starting cycle %s", cycle)

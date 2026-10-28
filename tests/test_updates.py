@@ -38,6 +38,20 @@ class UpdateTests(unittest.TestCase):
         job.description = "U.S. citizenship is required for this role."
         self.assertIn("citizenship", runner.disqualification_reason(job, config))
 
+    def test_discord_payload_fields_are_nonempty_and_bounded(self):
+        job = legacy.Job(title="Robotics Intern", company="Example", source="linkedin")
+        payload = legacy.format_discord_message(job, 80, "x" * 2000, "match")
+        payload["embeds"][0]["fields"][4]["value"] = ""
+        response = unittest.mock.Mock(status_code=204)
+        response.raise_for_status.return_value = None
+        with patch.object(runner.legacy.requests, "post", return_value=response) as post:
+            runner.post_discord(payload, "https://example.test/webhook")
+        self.assertEqual(post.call_args.kwargs["json"]["embeds"][0]["fields"][4]["value"], "Not provided")
+        payload = legacy.format_discord_message(job, 80, "x" * 2000, "match")
+        with patch.object(runner.legacy.requests, "post", return_value=response) as post:
+            runner.post_discord(payload, "https://example.test/webhook")
+        self.assertEqual(len(post.call_args.kwargs["json"]["embeds"][0]["fields"][4]["value"]), 1024)
+
     def test_failed_documents_remain_retryable_without_resending_alert(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

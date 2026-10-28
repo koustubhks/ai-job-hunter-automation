@@ -2,6 +2,11 @@ name: Job Hunter
 
 on:
   workflow_dispatch:
+    inputs:
+      retry_failed_only:
+        description: Retry only previously failed Discord alerts
+        type: boolean
+        default: false
   schedule:
     # 08:15 and 20:15 in Phoenix (UTC-7 year round).
     - cron: "15 3,15 * * *"
@@ -41,7 +46,12 @@ jobs:
         run: python cloud_state.py restore
       - name: Search and alert
         id: hunt
-        run: python job_hunter_robust.py --config job_hunter_cloud_config.json --once
+        run: |
+          if [ "${{ inputs.retry_failed_only }}" = "true" ]; then
+            python job_hunter_robust.py --config job_hunter_cloud_config.json --retry-failed-only
+          else
+            python job_hunter_robust.py --config job_hunter_cloud_config.json --once
+          fi
       - name: Encrypt updated job history
         id: save
         if: always() && steps.restore.outcome == 'success'
